@@ -25,23 +25,22 @@ class OpenFile(object):
 
 	def readMrcHeader(self, filename):
 				
-		#reads the mrc header lol
+		#reads the mrc header - Only the first 224 bytes of the header actually contain any useful information
+		
 		f = open(filename, 'rb')	#opens the file as read only and reads it as a binary file
-		fm_string = '<'+(10*'l')+(6*'f')+(3*'l')+(3*'f')+(27*'l')+(3*'f')+(4*'c')+'lfl'
+		fm_string = '<'+(10*'l')+(6*'f')+(3*'l')+(3*'f')+(27*'l')+(3*'f')+(4*'c')+'lfl'	#makes a string used in struct.unpack - shamelessly stolen from Tempy
 		header = list(struct.unpack(fm_string, f.read(224)))
 		
 		#making a readable annotated version - just used to look at whilst we're writing code lad lmao amiright
-		number = np.arange(60)
-		header_stack = np.column_stack([number[1:],header])
-		print( header_stack)
+		#number = np.arange(60)
+		#header_stack = np.column_stack([number[1:],header])
+		#print( header_stack)
 		
 		return header
 
 	def openImage(self):
 
-		'''
-		THIS FUNCTION IS CURRENTLY BROKEN - SAVED IMAGE HAS NO FEATURES AND STRANGE LEVELS
-		
+		'''		
 		This is a gimped function that only works on our .mrc files so will need to be edited to be more smart in the future
 
 		There is something in the header that says when the data starts but for us it was always zero so christ knows what it means
@@ -52,10 +51,11 @@ class OpenFile(object):
 		
 		col_number = header[0]
 		row_number = header[1]
-		print( col_number, row_number)
 		
 		'''
 		data_start = header[4]	would want to use this for the code to be more flexible - cba to do this at the moment though
+		
+		Also a problem in that motionCorr2 saves mrc files with virtually no header information becuase its shit
 		'''
 		#kills this function if opening an multi-dimensional mrc file like a density map or tomogram
 		section_number = header[2]
@@ -66,7 +66,14 @@ class OpenFile(object):
 		#Open the whole file and pull out correctly formatted image
 		with open(self.filename, 'rb') as f:
 			
-			#length of total file is 56956944
+			f.seek(1024) 	#Moves the current position to 1024 bytes in to the file which skips the header info which we don't want
+			
+			data_chunk = np.fromfile(f, dtype = 'float32', count = col_number*row_number)		#float32 is gimped for our data only
+			
+			'''
+			TURNS OUT THIS WORKED ALL ALONG, I JUST MIXED UP THE ORDER OF COLUMNS AND ROWS BEFORE HURRRRRAAAAAAYYYYY GLAD IT DIDNT TAKE TWO HOURS TO FIGURE OUT!!! 
+			
+			We may as well use the numpy method though as its easier to understand and a lot faster
 					
 			#Making a string for opening the file using the C-struct open function - 1024*x ignores all bytes in the header file
 			#this is gimped to always use floats which might not always be ideal
@@ -76,12 +83,16 @@ class OpenFile(object):
 			whole_file = struct.unpack(data_open_string, f.read((col_number*row_number)*4+1024))
 
 			data_chunk = np.float32(whole_file)
+			'''
 			
-			image = np.reshape(data_chunk, [col_number, row_number])
-						
-			io.imsave('test.tiff',image)
+			image = np.reshape(data_chunk, [row_number, col_number])
+					
+			#io.imsave('test.tiff',image)
 			
-			self.image = image 
+			self.image = image
+			
+			
+			
 
 #class FindMicrotubules():
 
