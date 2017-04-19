@@ -1,0 +1,5 @@
+#This is a cfg file
+
+#Pixel size is in angstrom units
+[input]
+Pixel Size = 1.39
