@@ -8,13 +8,14 @@ from mt_tools import OpenFile
 import os
 
 directory = os.listdir('.')
-it_count = 0
+
 
 for filename in directory:
-	it_count +=1
+
 	if filename[-4:] == '.mrc':
-		image = OpenFile(filename, it_count)
-		header = image.readMrcHeader(filename)
+		image = OpenFile(filename)
+		image_data = image.openImage()
+		quit()
 
 	else:
 		continue
