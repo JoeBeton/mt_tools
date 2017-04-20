@@ -6,14 +6,14 @@ from __future__ import print_function
 
 import numpy as np
 import struct
-from skimage import io
-
+from skimage import io, measure, draw
+from scipy import ndimage
 
 class OpenFile(object):
 	'''
 	A class for opening .mrc image files of motionCorr corrected EM images
 	
-	Not at all sure that this needs to be a class rather than a list of functions but oh well
+	The class constructs an object containing all the image data and important information needed for calculations later in the code, such as image dimensions and filename
 	
 	The structure of the mrc header information can be found at: http://www.ccpem.ac.uk/mrc_format/mrc2000.php
 	'''
@@ -49,8 +49,8 @@ class OpenFile(object):
 		#Get relevant header information
 		header = self.readMrcHeader(self.filename)
 		
-		col_number = header[0]
-		row_number = header[1]
+		self.col_number = header[0]
+		self.row_number = header[1]
 		
 		#Making a dictionary for correct parsing of data - again taken shamelessly from Tempy
 		
@@ -74,26 +74,83 @@ class OpenFile(object):
 			
 			#Some sort of addition f.seek(number) that accounts for the differing start points as stipulated by the header
 			
-			data_chunk = np.fromfile(f, dtype = mrcNumpy[header[3]], count = col_number*row_number)	#takes all the pixel values from the mrc file
+			data_chunk = np.fromfile(f, dtype = mrcNumpy[header[3]], count = self.col_number*self.row_number)	#takes all the pixel values from the mrc file
 			
-			image = np.reshape(data_chunk, [row_number, col_number])	#creates an array with the correct dimensions 
+			image = np.reshape(data_chunk, [self.row_number, self.col_number])	#creates an array with the correct dimensions 
 			
 			self.image_data = image
 			
 			return self
-		
-	def binImage(self):
-		
-		#we will definitely want to make some kind of binned image to jack around with - better SNR and less memory needed so faster
-		
+
+	def makeConfig(self):
 		pass
 		
+	
+	def openConfig(self):
+		
+		pixel_size = 1.39
+		
+		self.pixel_size = pixel_size
+		
+		return self
 
 
-#class FindMicrotubules():
-
+class FindMicrotubules(object):		#called with the image_object from openImage class - this will almost certainly create a massive headache down the line
+	def __init__(self):
+		pass
+	
+	def bandPassFilter(self, image_data):
+		#Apply a band pass filter of desired dimensions (in real space) to the image - couldn't find any prewritten stuff on skimage or ndimage so may as well write our own lel.
+		
+		#Need to get the fourier transform of the original image and apply a circular mask of appropriate size? - I'm SURE there's a better mathmatical way to do this.
+		
+		#fft_image = np.fft.fft2(image_data) #the overall shape of the fft image is the same - however the pixel order is inverted in a weird way I don't understand
+		#io.imsave('fft_image.tiff',np.float32(fft_image))
+		
+		
+		fft_image = np.fft.fft2(image_data)
+		fft_dimensions = np.shape(fft_image)	
+		
+		#Constructing a circular mask to apply to the fft of the original image
+		central_coordinate = [int(fft_dimensions[0]/2), int(fft_dimensions[1]/2)]
+		radius = 400 #this will need to calculated depending on the extent of filtering required
+		mask_shape_x, mask_shape_y = draw.circle(central_coordinate[0], central_coordinate[1], radius)
+		fft_mask = np.zeros((fft_dimensions[0], fft_dimensions[1]), dtype = np.complex128)
+		fft_mask[mask_shape_x, mask_shape_y] = 1
+		
+		#Applying the mask to the fft of the original image - Current problem is that the FFT is ordered radically differently to the image in terms of pixel positions
+		filtered_fft = np.multiply(fft_image, fft_mask) 			#remains a complex128 array after masking
+		filtered_image = np.fft.fft2(filtered_fft)
+		
+		io.imsave('filtered_fft.tiff',np.float32(filtered_fft))
+		io.imsave('filtered_image.tiff',np.float32(filtered_image))
+		
+		
+	def findIce(self):
+		#Will always want to box microtubules that are sitting in the ice and not over carbon
+		#However, there isn't always carbon in an image and there is often absolutely loads of carbon in an image
+		#how in gods name can we deal with that problem
+		
+		#could try to find the ice/carbon interface using a sobel filter? - need to bin and remove high frequency components?
+		
+		binned_image = measure.block_reduce(self.image_data, block_size = (4,4), func = np.mean)
+		
+		FindMicrotubules.bandPassFilter(self, binned_image)
+		
+		sobel_image = ndimage.sobel(binned_image)
+		
+		io.imsave('binnedtest.tiff',sobel_image)
+		
+		
 
 
 #class BoxMicrotubules():
 
 
+###################################################
+#Function Tests
+###################################################
+
+if __name__ == '__main__':
+	pass
+	#run some tests
