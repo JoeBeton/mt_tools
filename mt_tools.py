@@ -52,47 +52,43 @@ class OpenFile(object):
 		col_number = header[0]
 		row_number = header[1]
 		
-		'''
-		data_start = header[4]	would want to use this for the code to be more flexible - cba to do this at the moment though
+		#Making a dictionary for correct parsing of data - again taken shamelessly from Tempy
 		
-		Also a problem in that motionCorr2 saves mrc files with virtually no header information becuase its shit
-		'''
-		#kills this function if opening an multi-dimensional mrc file like a density map or tomogram
+		mrcNumpy = {
+			1: np.uint8,
+			2: np.float32,
+			4: np.complex64
+		}
+		
+		#kills this function if opening a multi-dimensional mrc file like a density map or tomogram
 		section_number = header[2]
 		if section_number != 1:
 			print('No 3-dimensional arrays please')
-			return
+			self.image = False
+			return self
 		
 		#Open the whole file and pull out correctly formatted image
 		with open(self.filename, 'rb') as f:
 			
 			f.seek(1024) 	#Moves the current position to 1024 bytes in to the file which skips the header info which we don't want
 			
-			data_chunk = np.fromfile(f, dtype = 'float32', count = col_number*row_number)		#float32 is gimped for our data only
+			#Some sort of addition f.seek(number) that accounts for the differing start points as stipulated by the header
 			
-			'''
-			TURNS OUT THIS WORKED ALL ALONG, I JUST MIXED UP THE ORDER OF COLUMNS AND ROWS BEFORE HURRRRRAAAAAAYYYYY GLAD IT DIDNT TAKE TWO HOURS TO FIGURE OUT!!! 
+			data_chunk = np.fromfile(f, dtype = mrcNumpy[header[3]], count = col_number*row_number)	#takes all the pixel values from the mrc file
 			
-			We may as well use the numpy method though as its easier to understand and a lot faster
-					
-			#Making a string for opening the file using the C-struct open function - 1024*x ignores all bytes in the header file
-			#this is gimped to always use floats which might not always be ideal
-			data_open_string = '<'+(1024*'x')+((col_number*row_number)*'f')
+			image = np.reshape(data_chunk, [row_number, col_number])	#creates an array with the correct dimensions 
 			
-			#This unpacks the data in the file - the *4 scaling is TOTALLY gimped and I have no idea why its 4 and not 8 for example
-			whole_file = struct.unpack(data_open_string, f.read((col_number*row_number)*4+1024))
+			self.image_data = image
+			
+			return self
+		
+	def binImage(self):
+		
+		#we will definitely want to make some kind of binned image to jack around with - better SNR and less memory needed so faster
+		
+		pass
+		
 
-			data_chunk = np.float32(whole_file)
-			'''
-			
-			image = np.reshape(data_chunk, [row_number, col_number])
-					
-			#io.imsave('test.tiff',image)
-			
-			self.image = image
-			
-			
-			
 
 #class FindMicrotubules():
 

@@ -6,6 +6,8 @@ from __future__ import print_function
 
 from mt_tools import OpenFile
 import os
+from skimage import io
+
 
 directory = os.listdir('.')
 
@@ -13,8 +15,13 @@ directory = os.listdir('.')
 for filename in directory:
 
 	if filename[-4:] == '.mrc':
+		
 		image = OpenFile(filename)
-		image_data = image.openImage()
+		
+		image = image.openImage()
+		
+		io.imsave('test.tiff',image.image_data)
+		
 		quit()
 
 	else:
