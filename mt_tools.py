@@ -6,7 +6,7 @@ from __future__ import print_function
 
 import numpy as np
 import struct
-from skimage import io, measure, draw
+from skimage import io, measure, draw, feature
 from scipy import ndimage
 
 class OpenFile(object):
@@ -104,26 +104,33 @@ class FindMicrotubules(object):		#called with the image_object from openImage cl
 		
 		#Need to get the fourier transform of the original image and apply a circular mask of appropriate size? - I'm SURE there's a better mathmatical way to do this.
 		
-		#fft_image = np.fft.fft2(image_data) #the overall shape of the fft image is the same - however the pixel order is inverted in a weird way I don't understand
-		#io.imsave('fft_image.tiff',np.float32(fft_image))
-		
-		
 		fft_image = np.fft.fft2(image_data)
 		fft_dimensions = np.shape(fft_image)	
 		
-		#Constructing a circular mask to apply to the fft of the original image
+		#Constructing a circular mask to apply to the FFT
 		central_coordinate = [int(fft_dimensions[0]/2), int(fft_dimensions[1]/2)]
-		radius = 400 #this will need to calculated depending on the extent of filtering required
+		radius = 10 #this will need to calculated depending on the extent of filtering required
 		mask_shape_x, mask_shape_y = draw.circle(central_coordinate[0], central_coordinate[1], radius)
-		fft_mask = np.zeros((fft_dimensions[0], fft_dimensions[1]), dtype = np.complex128)
-		fft_mask[mask_shape_x, mask_shape_y] = 1
+		fft_mask = np.zeros((fft_dimensions[0], fft_dimensions[1]), dtype = np.complex128)				#making an initisalised array of 0's
+		fft_mask[mask_shape_x, mask_shape_y] = 1														#building in the circular mask in to the array
 		
-		#Applying the mask to the fft of the original image - Current problem is that the FFT is ordered radically differently to the image in terms of pixel positions
+		#Reordering the mask so that it can be applied to the wierdly ordered FFT
+		quadrant4 = fft_mask[0:central_coordinate[0], 0:central_coordinate[1]]
+		quadrant2 = quadrant4[::-1]
+		quadrant1 =  fft_mask[central_coordinate[0]:fft_dimensions[0], central_coordinate[1]:fft_dimensions[1]]
+		quadrant3 = quadrant1[::-1]
+		half1 = np.concatenate((quadrant1,quadrant2), axis = 1)
+		half2 = np.concatenate((quadrant3,quadrant4), axis = 1)
+		fft_mask = np.append(half1,half2, axis = 0)
+
+		#Applying the mask to the fft of the original image
 		filtered_fft = np.multiply(fft_image, fft_mask) 			#remains a complex128 array after masking
 		filtered_image = np.fft.fft2(filtered_fft)
 		
-		io.imsave('filtered_fft.tiff',np.float32(filtered_fft))
+		io.imsave('quadrant.tiff',np.float32(fft_mask))
 		io.imsave('filtered_image.tiff',np.float32(filtered_image))
+		
+		return np.float32(filtered_image)
 		
 		
 	def findIce(self):
@@ -135,11 +142,13 @@ class FindMicrotubules(object):		#called with the image_object from openImage cl
 		
 		binned_image = measure.block_reduce(self.image_data, block_size = (4,4), func = np.mean)
 		
-		FindMicrotubules.bandPassFilter(self, binned_image)
+		filtered_image = FindMicrotubules.bandPassFilter(self, binned_image)
 		
-		sobel_image = ndimage.sobel(binned_image)
+		sobel_image = ndimage.sobel(filtered_image)
 		
-		io.imsave('binnedtest.tiff',sobel_image)
+		canny_image = feature.canny(filtered_image, 5)
+		
+		io.imsave('canny_image.tiff',np.float32(canny_image))
 		
 		
 
